@@ -1,6 +1,6 @@
 # Coarse–graining, fixed points, and scaling in a large population of neurons
 
-**[Show Notebook][Notebook.md]**
+**[Show Notebook](Notebook.md)**
 
 Work in progress implementing the data analysis from the paper.
 
