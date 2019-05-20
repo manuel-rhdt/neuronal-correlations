@@ -64,12 +64,23 @@ plt.show()
 
 
 ```python
-data.shape
+p_zero, p_errs, cluster_sizes = neurenorm.renormalize_and_compute_p(data)
 ```
 
 
+```python
+def neg_log(data):
+    return -np.log(data)
+```
 
 
-    (891, 18000)
+```python
+errs = neg_log(p_zero + p_errs / 2) - neg_log(p_zero - p_errs / 2)
+plt.errorbar(cluster_sizes, neg_log(p_zero), yerr=errs, fmt='o')
+plt.yscale('log')
+plt.xscale('log')
+```
 
+
+![png](Notebook_files/Notebook_9_0.png)
 

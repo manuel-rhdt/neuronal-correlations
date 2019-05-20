@@ -98,7 +98,15 @@ def perform_renormalization(data, times=1):
 
 
 def p_zero(data):
-    return np.size(data[data <= EPSILON]) / np.size(data)
+    zero_elems = data <= EPSILON
+    fraction = np.sum(zero_elems, axis=-1) / np.size(zero_elems, axis=-1)
+    return np.mean(fraction)
+
+
+def p_zero_err(data):
+    zero_elems = data <= EPSILON
+    fraction = np.sum(zero_elems, axis=-1) / np.size(zero_elems, axis=-1)
+    return np.std(fraction)
 
 
 def make_histogram(data):
@@ -125,9 +133,15 @@ def renormalize_and_compute_p(data, times=9):
 
     This function returns the values used to create the plot on the left of 
     fig. 3.
+
+    Returns a tuple (values, errors, cluster_sizes)
     """
     rg_list = perform_renormalization(data, times)
-    return np.array([p_zero(rg_data) for rg_data in rg_list])
+    vals = np.array([p_zero(rg_data) for rg_data in rg_list])
+    errors = np.array([p_zero_err(rg_data) for rg_data in rg_list])
+    cluster_sizes = 2 ** np.arange(len(vals))
+    return (vals, errors, cluster_sizes)
+
 
 def main():
     parser = argparse.ArgumentParser(
