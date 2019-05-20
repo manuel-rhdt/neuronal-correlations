@@ -21,8 +21,9 @@ def normalize_data(data):
     return data / norm
 
 
-def generate_random_filtered_data(size, num_neurons = 1000, clip_to=0.995):
-    unfiltered_data = np.reshape(np.random.random(size * num_neurons), (num_neurons, size))
+def generate_random_filtered_data(size, num_neurons=1000, clip_to=0.995):
+    unfiltered_data = np.reshape(np.random.random(
+        size * num_neurons), (num_neurons, size))
     return normalize_data(np.clip(unfiltered_data, clip_to, 1.0) - clip_to)
 
 
@@ -78,6 +79,17 @@ def renormalization_step(data, correlation_matrix):
 
 
 def perform_renormalization(data, times=1):
+    """ Succesively renormalizes the `data` according to the method described
+    in the paper. The number of RG steps performed is `times`.
+
+    Returns a list of data matrices where the first element is simply the
+    original data and the following elements are 
+    - data after one RG step,
+    - data after two RG steps,
+    - ...
+
+    The returned list therefore is of length `times + 1`.
+    """
     newdata = [data]
     for _ in range(0, times):
         correlation_matrix = compute_correlation_coefficients(newdata[-1])
@@ -107,6 +119,16 @@ def make_histogram(data):
     return np.array([x, y])
 
 
+def renormalize_and_compute_p(data, times=9):
+    """ Computes the values of `P_0` (notation from the paper) for the data
+    at successive RG steps. There are `times` RG steps performed.
+
+    This function returns the values used to create the plot on the left of 
+    fig. 3.
+    """
+    rg_list = perform_renormalization(data, times)
+    return np.array([p_zero(rg_data) for rg_data in rg_list])
+
 def main():
     parser = argparse.ArgumentParser(
         description='Compute correlations and perform renormalization.')
@@ -114,8 +136,7 @@ def main():
     args = parser.parse_args()
 
     data = load_data(args.input)
-    data = perform_renormalization(data, 8)
-    print(p_zero(data[0]))
+    print(renormalize_and_compute_p(data))
 
 
 if __name__ == "__main__":
