@@ -83,7 +83,7 @@ def perform_renormalization(data, times=1):
     in the paper. The number of RG steps performed is `times`.
 
     Returns a list of data matrices where the first element is simply the
-    original data and the following elements are 
+    original data and the following elements are
     - data after one RG step,
     - data after two RG steps,
     - ...
@@ -127,20 +127,29 @@ def make_histogram(data):
     return np.array([x, y])
 
 
-def renormalize_and_compute_p(data, times=9):
+def compute_p_trajectory(renormalized_data):
     """ Computes the values of `P_0` (notation from the paper) for the data
-    at successive RG steps. There are `times` RG steps performed.
+    at successive RG steps. The data must already be renormalized (i.e. use
+    the output of `perform_renormalization`).
 
-    This function returns the values used to create the plot on the left of 
+    This function returns the values used to create the plot on the left of
     fig. 3.
 
     Returns a tuple (values, errors, cluster_sizes)
     """
-    rg_list = perform_renormalization(data, times)
-    vals = np.array([p_zero(rg_data) for rg_data in rg_list])
-    errors = np.array([p_zero_err(rg_data) for rg_data in rg_list])
+    vals = np.array([p_zero(rg_data) for rg_data in renormalized_data])
+    errors = np.array([p_zero_err(rg_data) for rg_data in renormalized_data])
     cluster_sizes = 2 ** np.arange(len(vals))
     return (vals, errors, cluster_sizes)
+
+
+def correlation_matrix_eigenvalues_sorted(data):
+    """ Computes the matrix of correlation coefficients from data and returns
+    its eigenvalues sorted in decreasing order.
+    """
+    corr_coef = compute_correlation_coefficients(data)
+    eigen_vals, _ = np.linalg.eig(corr_coef)
+    return -np.sort(-eigen_vals)
 
 
 def main():
@@ -150,7 +159,7 @@ def main():
     args = parser.parse_args()
 
     data = load_data(args.input)
-    print(renormalize_and_compute_p(data))
+    print(compute_p_trajectory(perform_renormalization(data, times=8)))
 
 
 if __name__ == "__main__":
