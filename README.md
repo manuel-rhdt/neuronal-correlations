@@ -1,6 +1,6 @@
 # Coarse–graining, fixed points, and scaling in a large population of neurons
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/manuel-rhdt/neuronal-correlations/master) **[Show Notebook in Github](Notebook.md)**
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/manuel-rhdt/neuronal-correlations/master) **[Show Notebook in Github](Notebook.ipynb)**
 
 Work in progress implementing the data analysis from the paper.
 
