@@ -1,8 +1,8 @@
 import argparse
 import math
 
-from PIL import Image
 import numpy as np
+from PIL import Image
 
 EPSILON = 1e-5
 
