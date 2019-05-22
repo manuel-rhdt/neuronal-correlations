@@ -1,7 +1,7 @@
 import argparse
 import math
 
-from libtiff import TIFF
+from PIL import Image
 import numpy as np
 
 EPSILON = 1e-5
@@ -10,8 +10,8 @@ EPSILON = 1e-5
 def load_data(filename):
     """ Loads the data from a TIFF file and returns a normalized numpy array.
     """
-    tif = TIFF.open(filename)
-    return normalize_data(tif.read_image())
+    im = Image.open(filename)
+    return normalize_data(np.array(im))
 
 
 def normalize_data(data):
