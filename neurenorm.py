@@ -1,17 +1,8 @@
-import argparse
 import math
-
 import numpy as np
 from PIL import Image
 
-EPSILON = 1e-5
-
-
-def load_data(filename):
-    """ Loads the data from a TIFF file and returns a normalized numpy array.
-    """
-    im = Image.open(filename)
-    return normalize_data(np.array(im))
+EPSILON = 1e-7
 
 
 def normalize_data(data):
@@ -20,6 +11,17 @@ def normalize_data(data):
     norm = np.mean(data[data > EPSILON], axis=-1)
     return data / norm
 
+
+def binarize_data(data):
+    """ Make the data binary.
+    """
+    return (data > EPSILON).astype(float)
+
+def load_data(filename, norm=normalize_data):
+    """ Loads the data from a TIFF file and returns a normalized numpy array.
+    """
+    im = Image.open(filename)
+    return norm(np.array(im))
 
 def generate_random_filtered_data(size, num_neurons=1000, clip_to=0.995):
     unfiltered_data = np.reshape(np.random.random(
@@ -33,7 +35,7 @@ def compute_correlation_coefficients(data):
     return np.corrcoef(data)
 
 
-def renormalization_step(data, correlation_matrix):
+def renormalization_step(data, correlation_matrix, norm=normalize_data):
     """ returns the renormalized data
     """
 
@@ -58,11 +60,14 @@ def renormalization_step(data, correlation_matrix):
     most_correlated_pairs = np.zeros((2, n_half), dtype=int)
     len_pairs = 0
 
-    for index in indices:
-        i, j = np.unravel_index(index, correlation_matrix.shape)
+    # only look at the upper triangular elements of the correlation matrix
+    i, j = np.unravel_index(indices, correlation_matrix.shape)
+    i_gt_j = i > j
+    i = i[i_gt_j]
+    j = j[i_gt_j]
 
-        # only look at the upper triangular elements of the correlation matrix
-        if i > j and not visited_neurons[i] and not visited_neurons[j]:
+    for i, j in zip(i, j):
+        if not visited_neurons[i] and not visited_neurons[j]:
             visited_neurons[i] = True
             visited_neurons[j] = True
             most_correlated_pairs[:, len_pairs] = [i, j]
@@ -73,7 +78,7 @@ def renormalization_step(data, correlation_matrix):
     i = most_correlated_pairs[0]
     j = most_correlated_pairs[1]
 
-    renormalized_data = normalize_data(data[i] + data[j])
+    renormalized_data = norm(data[i] + data[j])
 
     return renormalized_data
 
@@ -153,6 +158,8 @@ def correlation_matrix_eigenvalues_sorted(data):
 
 
 def main():
+    import argparse
+
     parser = argparse.ArgumentParser(
         description='Compute correlations and perform renormalization.')
     parser.add_argument('input')

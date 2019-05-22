@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import neurenorm
 from neurenorm import generate_random_filtered_data, renormalization_step, compute_correlation_coefficients, EPSILON
 
 
@@ -17,6 +18,15 @@ class TestRenormalizationStep(unittest.TestCase):
         rdata = renormalization_step(data, corr)
         self.assertEqual(rdata.shape, (50, 10000))
 
+class TestBinarization(unittest.TestCase):
+    def test_binarization(self):
+        data = generate_random_filtered_data(1000, num_neurons=100)
+        data = neurenorm.binarize_data(data)
+        for val in np.nditer(data):
+            if val > 0.5:
+                self.assertAlmostEqual(val, 1.0)
+            else:
+                self.assertAlmostEqual(val, 0.0)
 
 if __name__ == '__main__':
     unittest.main()
