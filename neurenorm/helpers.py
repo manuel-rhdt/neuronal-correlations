@@ -1,4 +1,3 @@
-import math
 import numpy as np
 from PIL import Image
 
@@ -17,11 +16,13 @@ def binarize_data(data):
     """
     return (data > EPSILON).astype(float)
 
+
 def load_data(filename, norm=normalize_data):
     """ Loads the data from a TIFF file and returns a normalized numpy array.
     """
     im = Image.open(filename)
     return norm(np.array(im))
+
 
 def generate_random_filtered_data(size, num_neurons=1000, clip_to=0.995):
     unfiltered_data = np.reshape(np.random.random(
@@ -33,73 +34,6 @@ def compute_correlation_coefficients(data):
     """ Returns a matrix of correlation coefficients from the given data.
     """
     return np.corrcoef(data)
-
-
-def renormalization_step(data, correlation_matrix, norm=normalize_data):
-    """ returns the renormalized data
-    """
-
-    assert len(data) == len(correlation_matrix)
-
-    n = len(data)
-    n_half = math.floor(n / 2)
-
-    # subtract the identity matrix since the diagonal of the correlation matrix
-    # contains only 1's.
-    correlation_matrix = correlation_matrix - \
-        np.identity(len(correlation_matrix))
-
-    # we sort the negative correlation matrix to get the biggest element first.
-    # This works because all entries in the correlation matrix range from 0 to 1.
-    #
-    # `indices` contains the sorted flattened indices of the most correlated pairs.
-    indices = np.argsort(-correlation_matrix, axis=None)
-
-    # a list of bool's to keep track of the visited neurons
-    visited_neurons = np.zeros(n, dtype=bool)
-    most_correlated_pairs = np.zeros((2, n_half), dtype=int)
-    len_pairs = 0
-
-    # only look at the upper triangular elements of the correlation matrix
-    i, j = np.unravel_index(indices, correlation_matrix.shape)
-    i_gt_j = i > j
-    i = i[i_gt_j]
-    j = j[i_gt_j]
-
-    for i, j in zip(i, j):
-        if not visited_neurons[i] and not visited_neurons[j]:
-            visited_neurons[i] = True
-            visited_neurons[j] = True
-            most_correlated_pairs[:, len_pairs] = [i, j]
-            len_pairs += 1
-            if len_pairs >= n_half:
-                break
-
-    i = most_correlated_pairs[0]
-    j = most_correlated_pairs[1]
-
-    renormalized_data = norm(data[i] + data[j])
-
-    return renormalized_data
-
-
-def perform_renormalization(data, times=1):
-    """ Succesively renormalizes the `data` according to the method described
-    in the paper. The number of RG steps performed is `times`.
-
-    Returns a list of data matrices where the first element is simply the
-    original data and the following elements are
-    - data after one RG step,
-    - data after two RG steps,
-    - ...
-
-    The returned list therefore is of length `times + 1`.
-    """
-    newdata = [data]
-    for _ in range(0, times):
-        correlation_matrix = compute_correlation_coefficients(newdata[-1])
-        newdata.append(renormalization_step(newdata[-1], correlation_matrix))
-    return newdata
 
 
 def p_zero(data):
@@ -155,19 +89,3 @@ def correlation_matrix_eigenvalues_sorted(data):
     corr_coef = compute_correlation_coefficients(data)
     eigen_vals, _ = np.linalg.eig(corr_coef)
     return -np.sort(-eigen_vals)
-
-
-def main():
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description='Compute correlations and perform renormalization.')
-    parser.add_argument('input')
-    args = parser.parse_args()
-
-    data = load_data(args.input)
-    print(compute_p_trajectory(perform_renormalization(data, times=8)))
-
-
-if __name__ == "__main__":
-    main()
