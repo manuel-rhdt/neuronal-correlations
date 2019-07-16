@@ -118,8 +118,9 @@ def cluster_recursive(data,
     clustered_data = apply_clustering(data, clusters, norm)
     pairs = cluster_pairs(clustered_data, clustering_strategy)
 
-    # Here we use the previous `clusters` array and merge according to `pairs`
-    # this was complicated to write but seems to work fine
+    # Here we use the previous `clusters` array and merge them according to `pairs`.
+    # This was complicated to write but seems to work fine. I admit I don't completely understand
+    # every aspect of this code.
     with np.nditer([pairs, np.arange(len(clusters)), None],
                    op_axes=[[-1, 0, 1], [0, -1, -1], None]) as itr:
         for a, b, out in itr:
@@ -128,10 +129,3 @@ def cluster_recursive(data,
         out.shape = (out.shape[0] * out.shape[1], out.shape[2])
         cluster_matrices.append(out)
         return cluster_matrices
-
-
-def generate_clustering_levels(data,
-                               num_clustering_steps, 
-                               clustering_strategy='correlation', 
-                               norm=normalize_data):
-    pass

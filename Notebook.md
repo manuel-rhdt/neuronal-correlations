@@ -6,9 +6,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
 import json
+import math
 
 plt.style.use('bmh')
-plt.rcParams["figure.figsize"] = (6/1.5,7/1.5)
+plt.rcParams["figure.figsize"] = (7/1.5,7/1.5)
 plt.rcParams["figure.dpi"] = 200
 ```
 
@@ -25,8 +26,12 @@ data = neurenorm.load_data("data.tif")
 
 ```python
 # This returns a list of the different renormalization steps
-clusterings = neurenorm.cluster_recursive(data, 9, clustering_strategy='random')
-rdata = [neurenorm.apply_clustering(data, clusters) for clusters in clusterings]
+clusterings = {}
+rdata = {} #< renormalized data
+strategies = ['correlation', 'random']
+for strategy in strategies:
+    clusterings[strategy] = neurenorm.cluster_recursive(data, 9, clustering_strategy=strategy)
+    rdata[strategy] = [neurenorm.apply_clustering(data, clusters) for clusters in clusterings[strategy]]
 ```
 
 
@@ -39,26 +44,40 @@ def sorted_eigenvals_for_cluster(data, cluster):
 
 
 ```python
-for index in range(5,8):
-    clusters = clusterings[index].T
-    eigen_vals = np.zeros_like(clusters, float)
-    for jdex, cluster in enumerate(clusters):
-        eigen_vals[jdex][...] = sorted_eigenvals_for_cluster(data, cluster)
-    
-    eig_vals_mean = np.mean(eigen_vals, axis=0)
-    eig_vals_err = np.std(eigen_vals, axis=0, ddof=1)
-        
-    x = np.arange(1, len(eig_vals_mean) + 1) / (2**index)
-    plt.errorbar(x, eig_vals_mean, yerr=eig_vals_err, fmt='o', markersize=1, elinewidth=0.5, label="$K={}$".format(2**index))
+fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
+fig.suptitle('Scaling of eigenvalues in covariance spectra')
+for plot_i, (ax, strategy) in enumerate(zip(axs, strategies)):
+    popt_arr = []
+    for index in range(4,8):
+        size_k = 2**index
+        clusters = clusterings[strategy][index].T
+        eigen_vals = np.zeros_like(clusters, float)
+        for jdex, cluster in enumerate(clusters):
+            eigen_vals[jdex][...] = sorted_eigenvals_for_cluster(data, cluster)
 
-plt.yscale('log')
-plt.xscale('log')
-plt.xlim(10**-2, 10**-.5)
-plt.xlabel('$\mathrm{rank} / K$')
-plt.ylabel('eigenvalue')
-plt.title('Scaling of eigenvalues in covariance spectra')
-plt.legend(loc=0)
-plt.show()
+        # eigenvalues and errors
+        eig_vals_mean = np.mean(eigen_vals, axis=0)
+        eig_vals_err = np.std(eigen_vals, axis=0, ddof=1)
+
+        # Fitting
+        rank = np.arange(1, len(eig_vals_mean) + 1)
+        lamda = lambda rank, mu, b: b * np.power(size_k / rank, mu)
+        popt, perr = curve_fit(lamda, rank, eig_vals_mean)
+        popt_arr.append(popt)
+
+        # plotting
+        ax.errorbar(rank / size_k, eig_vals_mean, yerr=eig_vals_err, fmt='o', markersize=1, elinewidth=0.5, label="$K={}$".format(size_k))
+
+    mu, b = np.mean(popt_arr, axis=0)
+    x = np.linspace(1/2**7, 1.0, 10)
+    ax.plot(x, b * np.power(1.0/x, mu), label="$\mu={:.2}$".format(mu))
+
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.set_xlabel('$\mathrm{rank} / K$')
+    axs[0].set_ylabel('eigenvalue')
+    ax.set_title(strategy)
+    ax.legend(loc=0)
 ```
 
 
@@ -67,42 +86,39 @@ plt.show()
 
 
 ```python
-x = np.linspace(0, 1, len(data[0]))
+fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
+for plot_i, (ax, strategy) in enumerate(zip(axs, strategies)):
+    for i in [0, 4, 6, 7, 8]:
+        x, y = neurenorm.make_histogram(rdata[strategy][i])
+        ax.set_yscale('log')
+        ax.set_xlim(-0.5,8.5)
+        ax.plot(x, y, label="$K={}$".format(2**i))
 
-for subdata in rdata[::2]:
-    plt.plot(x, subdata[0])
-    
-plt.xlabel('fractional time')
-plt.ylabel('normalized activity')
-plt.show()
+    x = np.linspace(0,10,100)
+    empirical_samples = rdata[strategy][0][rdata[strategy][0] > .5]
+    std_deviation = np.std(empirical_samples, ddof=1)
+    mean = np.mean(empirical_samples)
+    gaussian = 1/(np.sqrt(2*math.pi) * std_deviation) * np.exp(-((x - mean)/std_deviation)**2/2.0)
+    ax.plot(x, gaussian, "--", label="indep.\nneurons", linewidth=1.5)
+
+    ax.set_xlabel('normalized activity')
+    ax.set_ylim(0.6*10**-4, 2)
+    ax.set_title(strategy)
+
+axs[0].set_ylabel('probability density')  
+axs[1].legend(loc=1)
 ```
 
 
-![png](Notebook_files/Notebook_6_0.png)
+
+
+    <matplotlib.legend.Legend at 0x1288dd7f0>
 
 
 
-```python
-for i in [0, 4, 6, 7, 8]:
-    x, y = neurenorm.make_histogram(rdata[i])
-    plt.yscale('log')
-    plt.xlim(-0.5,8.5)
-    plt.plot(x, y, label="$K={}$".format(2**i))
-plt.ylabel('probability density')
-plt.xlabel('normalized activity')
-plt.legend(loc=0)
-plt.ylim(0.6*10**-4, 2)
-plt.show()
-```
 
+![png](Notebook_files/Notebook_6_1.png)
 
-![png](Notebook_files/Notebook_7_0.png)
-
-
-
-```python
-p_zero, p_errs, cluster_sizes = neurenorm.compute_p_trajectory(rdata[:-1])
-```
 
 
 ```python
@@ -112,54 +128,51 @@ def neg_log(data):
 
 
 ```python
-# Fitting the exponents to the P_0 curve
+fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
+for plot_i, (ax, strategy) in enumerate(zip(axs, strategies)):
+    p_zero, p_errs, cluster_sizes = neurenorm.compute_p_trajectory(rdata[strategy][:-1])
 
-f = lambda x, beta, a: -a * np.power(x, beta)
-popt, perr = curve_fit(f, cluster_sizes, neg_log(p_zero))
+    # Fitting the exponents to the P_0 curve
+
+    f = lambda x, beta, a: -a * np.power(x, beta)
+    popt, perr = curve_fit(f, cluster_sizes, neg_log(p_zero))
+
+    x = np.linspace(.8, 500, 100)
+    ax.plot(x, f(x, *popt), 'C0-', label="$-a K^{{{:.2}}}$".format(popt[0]))
+    ax.plot(x, f(x, 1.0, popt[1]), 'C1:', linewidth=1, label="indep\nneurons")
+    ax.errorbar(cluster_sizes, neg_log(p_zero), fmt='C2o')
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.set_ylim(.02, 13)
+    ax.set_xlabel('cluster size $K$')
+    ax.legend(loc=2)
+    ax.set_title(strategy)
+
+
+axs[0].set_ylabel('$-\ln(P_0)$')
 ```
 
 
-```python
-popt, perr
-```
+
+
+    Text(0, 0.5, '$-\\ln(P_0)$')
 
 
 
 
-    (array([ 0.87347328, -0.02761152]), array([[3.21897073e-05, 4.66723522e-06],
-            [4.66723522e-06, 6.83818876e-07]]))
-
-
-
-
-```python
-x = np.linspace(.8, 500, 100)
-plt.plot(x, f(x, *popt), 'C0-', label="$-a K^{{{:.2}}}$".format(popt[0]))
-plt.plot(x, f(x, 1.0, popt[1]), 'C1:', linewidth=1, label="independent neurons")
-plt.errorbar(cluster_sizes, neg_log(p_zero), fmt='C2o')
-plt.yscale('log')
-plt.xscale('log')
-plt.ylim(.02, 13)
-plt.xlabel('cluster size $K$')
-plt.ylabel('$-\ln(P_0)$')
-plt.legend()
-plt.show()
-```
-
-
-![png](Notebook_files/Notebook_12_0.png)
+![png](Notebook_files/Notebook_8_1.png)
 
 
 
 ```python
-matrix = neurenorm.compute_correlation_coefficients(rdata[5])
+matrix = neurenorm.compute_correlation_coefficients(rdata['correlation'][5])
 matrix = np.abs(matrix - np.identity(len(matrix)))
 plt.imshow(matrix, interpolation='nearest')
 colorbar = plt.colorbar(ticks = [])
 ```
 
 
-![png](Notebook_files/Notebook_13_0.png)
+![png](Notebook_files/Notebook_9_0.png)
 
 
 
@@ -207,7 +220,7 @@ background = cluster_with_color(np.arange(len(masks)), masks, 'C9', 0.5)
 plt.imshow(background)
 for cluster_index in range(9):
     color = 'C{}'.format(cluster_index % 9)
-    cluster = clusterings[2].T[cluster_index]
+    cluster = clusterings['correlation'][2].T[cluster_index]
     im = cluster_with_color(cluster, masks, color, 0.8)
     plt.imshow(im)
     
@@ -215,7 +228,7 @@ plt.show()
 ```
 
 
-![png](Notebook_files/Notebook_16_0.png)
+![png](Notebook_files/Notebook_12_0.png)
 
 
 
