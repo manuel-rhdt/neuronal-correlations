@@ -26,6 +26,6 @@ The data and code are partially inspired by
 
 
 # What to do
-- Make a fit for the rank plot (see how the critical exponents change for random clustering)
-- Try to cluster neighbouring neurons (disregarding correlations)
-- reproduce the author's final plot
+- [x] Make a fit for the rank plot (see how the critical exponents change for random clustering)
+- [ ] Try to cluster neighbouring neurons (disregarding correlations)
+- [ ] reproduce the author's final plot
