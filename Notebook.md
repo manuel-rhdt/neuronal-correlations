@@ -5,12 +5,16 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.stats.kde import gaussian_kde
 import json
 import math
+```
 
+
+```python
 plt.style.use('bmh')
-plt.rcParams["figure.figsize"] = (7/1.5,7/1.5)
-plt.rcParams["figure.dpi"] = 200
+plt.rcParams["figure.figsize"] = np.array([7,5])*0.8
+plt.rcParams['figure.dpi'] = 180
 ```
 
 
@@ -44,10 +48,22 @@ def sorted_eigenvals_for_cluster(data, cluster):
 
 
 ```python
+def max_likelihood_exp(x):
+    xmin = np.min(x)
+    mu = 1 + np.size(x) * np.reciprocal(np.sum(np.log(x/xmin)))
+    return mu
+```
+
+
+```python
 fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
 fig.suptitle('Scaling of eigenvalues in covariance spectra')
+
+power_law_max = 0.7
+power_law_offset = [0.7, 0.9]
+
 for plot_i, (ax, strategy) in enumerate(zip(axs, strategies)):
-    popt_arr = []
+    mu_arr = []
     for index in range(4,8):
         size_k = 2**index
         clusters = clusterings[strategy][index].T
@@ -58,22 +74,22 @@ for plot_i, (ax, strategy) in enumerate(zip(axs, strategies)):
         # eigenvalues and errors
         eig_vals_mean = np.mean(eigen_vals, axis=0)
         eig_vals_err = np.std(eigen_vals, axis=0, ddof=1)
-
-        # Fitting
+        
+        # parameter estimation
         rank = np.arange(1, len(eig_vals_mean) + 1)
-        lamda = lambda rank, mu, b: b * np.power(size_k / rank, mu)
-        popt, perr = curve_fit(lamda, rank, eig_vals_mean)
-        popt_arr.append(popt)
+        power_law = eig_vals_mean[(rank / size_k) < power_law_max]
+        mu_arr.append(1.0/max_likelihood_exp(power_law))
 
         # plotting
         ax.errorbar(rank / size_k, eig_vals_mean, yerr=eig_vals_err, fmt='o', markersize=1, elinewidth=0.5, label="$K={}$".format(size_k))
 
-    mu, b = np.mean(popt_arr, axis=0)
-    x = np.linspace(1/2**7, 1.0, 10)
-    ax.plot(x, b * np.power(1.0/x, mu), label="$\mu={:.2}$".format(mu))
+    mu = np.mean(mu_arr, axis=0)
+    x = np.linspace(1/2**7, power_law_max, 10)
+    ax.plot(x, power_law_offset[plot_i] * np.power(1.0/x, mu), label="$\\mu = {{{:.2}}}$".format(mu), linewidth=1)
 
     ax.set_yscale('log')
     ax.set_xscale('log')
+    ax.set_ylim(0.3,7)
     ax.set_xlabel('$\mathrm{rank} / K$')
     axs[0].set_ylabel('eigenvalue')
     ax.set_title(strategy)
@@ -81,43 +97,33 @@ for plot_i, (ax, strategy) in enumerate(zip(axs, strategies)):
 ```
 
 
-![png](Notebook_files/Notebook_5_0.png)
+![png](Notebook_files/Notebook_7_0.png)
 
 
 
 ```python
 fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
 for plot_i, (ax, strategy) in enumerate(zip(axs, strategies)):
-    for i in [0, 4, 6, 7, 8]:
-        x, y = neurenorm.make_histogram(rdata[strategy][i])
+    for i in [0, 4, 5, 6, 7]:
+        samples = rdata[strategy][i].flatten()
+        samples = samples[samples > neurenorm.EPSILON]
+        kde = gaussian_kde(samples, 0.15)
+        x = np.linspace(0,10,100)
         ax.set_yscale('log')
         ax.set_xlim(-0.5,8.5)
-        ax.plot(x, y, label="$K={}$".format(2**i))
-
-    x = np.linspace(0,10,100)
-    empirical_samples = rdata[strategy][0][rdata[strategy][0] > .5]
-    std_deviation = np.std(empirical_samples, ddof=1)
-    mean = np.mean(empirical_samples)
-    gaussian = 1/(np.sqrt(2*math.pi) * std_deviation) * np.exp(-((x - mean)/std_deviation)**2/2.0)
-    ax.plot(x, gaussian, "--", label="indep.\nneurons", linewidth=1.5)
+        ax.plot(x, kde.pdf(x), label="$K={}$".format(2**i))
 
     ax.set_xlabel('normalized activity')
-    ax.set_ylim(0.6*10**-4, 2)
+    ax.set_ylim(0.6*10**-3, 1.2)
     ax.set_title(strategy)
 
 axs[0].set_ylabel('probability density')  
 axs[1].legend(loc=1)
+plt.show()
 ```
 
 
-
-
-    <matplotlib.legend.Legend at 0x1288dd7f0>
-
-
-
-
-![png](Notebook_files/Notebook_6_1.png)
+![png](Notebook_files/Notebook_8_0.png)
 
 
 
@@ -136,10 +142,13 @@ for plot_i, (ax, strategy) in enumerate(zip(axs, strategies)):
 
     f = lambda x, beta, a: -a * np.power(x, beta)
     popt, perr = curve_fit(f, cluster_sizes, neg_log(p_zero))
+    
+    print(popt)
 
     x = np.linspace(.8, 500, 100)
-    ax.plot(x, f(x, *popt), 'C0-', label="$-a K^{{{:.2}}}$".format(popt[0]))
-    ax.plot(x, f(x, 1.0, popt[1]), 'C1:', linewidth=1, label="indep\nneurons")
+    if plot_i == 0:
+        ax.plot(x, f(x, *popt), 'C0-', label="$-a K^{{{:.2}}}$".format(popt[0]))
+    ax.plot(x, f(x, 1.0, -0.02761152), 'C1:', linewidth=1, label="indep\nneurons")
     ax.errorbar(cluster_sizes, neg_log(p_zero), fmt='C2o')
     ax.set_yscale('log')
     ax.set_xscale('log')
@@ -152,6 +161,10 @@ for plot_i, (ax, strategy) in enumerate(zip(axs, strategies)):
 axs[0].set_ylabel('$-\ln(P_0)$')
 ```
 
+    [ 0.87347328 -0.02761152]
+    [ 0.84902047 -0.0472158 ]
+
+
 
 
 
@@ -160,7 +173,7 @@ axs[0].set_ylabel('$-\ln(P_0)$')
 
 
 
-![png](Notebook_files/Notebook_8_1.png)
+![png](Notebook_files/Notebook_10_2.png)
 
 
 
@@ -172,7 +185,7 @@ colorbar = plt.colorbar(ticks = [])
 ```
 
 
-![png](Notebook_files/Notebook_9_0.png)
+![png](Notebook_files/Notebook_11_0.png)
 
 
 
@@ -228,23 +241,5 @@ plt.show()
 ```
 
 
-![png](Notebook_files/Notebook_12_0.png)
-
-
-
-```python
-masks[0]
-```
-
-
-
-
-    array([[0., 0., 0., ..., 0., 0., 0.],
-           [0., 0., 0., ..., 0., 0., 0.],
-           [0., 0., 0., ..., 0., 0., 0.],
-           ...,
-           [0., 0., 0., ..., 0., 0., 0.],
-           [0., 0., 0., ..., 0., 0., 0.],
-           [0., 0., 0., ..., 0., 0., 0.]])
-
+![png](Notebook_files/Notebook_14_0.png)
 
